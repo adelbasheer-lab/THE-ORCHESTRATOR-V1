@@ -1,0 +1,11 @@
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client/streamableHttp.js";
+import type { AgentTools, ToolDefinition } from "./toolset.js";
+export interface RemoteMcpConfig { name:string; url:string; authToken?:string; }
+export class McpToolPlane implements AgentTools {
+ private clients=new Map<string,{client:Client}>(); readonly definitions:ToolDefinition[]=[]; private initialized=false;
+ constructor(private configs:RemoteMcpConfig[]=[]) {}
+ async initialize(){if(this.initialized)return;for(const cfg of this.configs){const client=new Client({name:"orchestrator-v1",version:"0.1.0"});const transport=new StreamableHTTPClientTransport(new URL(cfg.url),cfg.authToken?{requestInit:{headers:{Authorization:"Bearer "+cfg.authToken}}}:undefined);await client.connect(transport);const listed=await client.listTools();this.clients.set(cfg.name,{client});for(const tool of listed.tools as any[])this.definitions.push({name:"mcp__"+cfg.name+"__"+tool.name,description:"[MCP:"+cfg.name+"] "+(tool.description||tool.name),inputSchema:tool.inputSchema||{type:"object",properties:{}},strict:false});}this.initialized=true;}
+ async execute(name:string,input:Record<string,unknown>){await this.initialize();const parts=name.split("__");if(parts.length<3||parts[0]!=="mcp")throw new Error("Unknown MCP tool: "+name);const entry=this.clients.get(parts[1]);if(!entry)throw new Error("MCP server not found: "+parts[1]);return JSON.stringify(await entry.client.callTool({name:parts.slice(2).join("__"),arguments:input}));}
+}
+export class CompositeToolset implements AgentTools { readonly definitions:ToolDefinition[]; constructor(private sets:AgentTools[]){this.definitions=sets.flatMap(s=>s.definitions);} async execute(name:string,input:Record<string,unknown>){const set=this.sets.find(s=>s.definitions.some(d=>d.name===name));if(!set)throw new Error("Tool not found: "+name);return set.execute(name,input);} }
