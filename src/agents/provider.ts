@@ -1,0 +1,2 @@
+import type { AgentResult, AgentTurn } from "../core/types.js"; import type { AgentTools } from "../tools/toolset.js";
+export interface AgentProvider { run(turn:AgentTurn,tools?:AgentTools):Promise<AgentResult>; }
