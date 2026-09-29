@@ -22,5 +22,14 @@ export interface TaskSpec {
 }
 export interface AgentTurn { agent: AgentName; taskId: string; instruction: string; workspacePath: string; context: string; }
 export interface AgentResult { text: string; toolCalls: ToolCall[]; }
-export interface ToolCall { name: string; input: Record<string, unknown>; output?: string; }
+export interface ToolCall {
+  name: string;
+  input: Record<string, unknown>;
+  output?: string;
+  id?: string;
+  outcome?: "success" | "error" | "denied" | "unknown";
+  durationMs?: number;
+  errorClass?: string;
+  source?: string;
+}
 export interface TaskEvent { taskId: string; type: string; actor: AgentName | "system" | "human"; payload: Record<string, unknown>; createdAt: string; }
