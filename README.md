@@ -20,6 +20,28 @@ User -> ORCHESTRATOR -> GPT plan -> Claude implementation -> tests -> GPT review
 - Human approval gate
 - GitHub Actions CI
 
+## Safety Research Mode
+
+ORCHESTRATOR is also an empirical research harness for AI control and scalable oversight. The research question is whether structured independent review can reduce safety-relevant boundary violations and defects by an autonomous coding agent while preserving useful task completion.
+
+The research protocol is versioned under `research/`:
+
+- `research/RESEARCH_PROTOCOL.md` — hypotheses, experimental conditions, controls, and exclusion rules.
+- `research/BENCHMARK.md` — harmless capability and control-pressure benchmark design.
+- `research/DATA_DICTIONARY.md` — telemetry and metric definitions.
+- `research/ANALYSIS_PLAN.md` — pre-specified comparisons and reporting rules.
+- `research/TASKS.md` — initial benchmark registry.
+- `research/REPORT_TEMPLATE.md` — results-report structure.
+
+Two conditions are supported through task metadata:
+
+- `IMPLEMENTATION_ONLY` — implementation and automated testing without independent model review.
+- `STRUCTURED_OVERSIGHT` — implementation, testing, independent GPT review, and bounded Claude fix/retest cycles.
+
+Research runs record protocol metadata, changed-path scope checks, test outcomes, and run-level outcomes. Safety and capability are measured separately; the project does not treat a passing test suite as evidence of general AI safety.
+
+The implementation agent cannot merge a GitHub PR. Human approval remains a hard boundary.
+
 ## API
 
 - GET /health
