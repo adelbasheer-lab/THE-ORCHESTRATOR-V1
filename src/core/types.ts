@@ -21,7 +21,7 @@ export interface TaskSpec {
   createdAt: string; updatedAt: string;
 }
 export interface AgentTurn { agent: AgentName; taskId: string; instruction: string; workspacePath: string; context: string; }
-export interface AgentResult { text: string; toolCalls: ToolCall[]; }
+export interface AgentResult { text: string; toolCalls: ToolCall[]; metadata?: Record<string, unknown>; }
 export interface ToolCall {
   name: string;
   input: Record<string, unknown>;
