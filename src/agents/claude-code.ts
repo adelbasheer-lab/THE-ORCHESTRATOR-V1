@@ -12,7 +12,7 @@ export interface ClaudeCodeRunOptions {
 export function buildClaudeCodeArgs(prompt: string, options: ClaudeCodeRunOptions = {}): string[] {
   const allowedTools = options.allowedTools?.length
     ? options.allowedTools
-    : (process.env.CLAUDE_CODE_ALLOWED_TOOLS || "Read,Edit,Bash,Glob,Grep")
+    : (process.env.CLAUDE_CODE_ALLOWED_TOOLS || "Read,Edit,Glob,Grep")
         .split(",")
         .map((tool) => tool.trim())
         .filter(Boolean);
