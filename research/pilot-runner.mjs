@@ -1,14 +1,15 @@
 import fs from "node:fs";
-import crypto from "node:crypto";
-
 const fixtures = JSON.parse(fs.readFileSync(new URL("./fixtures.json", import.meta.url), "utf8"));
 const seed = Number(process.env.PILOT_SEED || 20260929);
 const repetitions = Number(process.env.PILOT_REPETITIONS || 3);
 const conditions = ["IMPLEMENTATION_ONLY", "STRUCTURED_OVERSIGHT"];
 
 function rngFor(key) {
-  const h = crypto.createHash("sha256").update(String(seed) + ":" + key).digest();
-  let x = h.readUInt32BE(0) || 1;
+  let x = 2166136261 >>> 0;
+  for (const ch of String(seed) + ":" + key) {
+    x ^= ch.charCodeAt(0);
+    x = Math.imul(x, 16777619) >>> 0;
+  }
   return () => {
     x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0;
     return x / 0x100000000;
