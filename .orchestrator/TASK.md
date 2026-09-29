@@ -2,26 +2,24 @@
 
 ## Objective
 
-Describe the requested change in one or two precise paragraphs.
+Add a simple utility function named `add` that accepts two numbers and returns their sum.
 
 ## Repository
 
-- Repository: OWNER/REPO
-- Base branch: main
+- Repository: adelbasheer-lab/THE-ORCHESTRATOR-V1
+- Base branch: orchestrator/v1
 
 ## Acceptance criteria
 
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Criterion 3
+- [ ] Add the `add` utility.
+- [ ] Add unit tests for positive numbers.
+- [ ] Add unit tests for negative numbers.
+- [ ] Existing tests must continue to pass.
+- [ ] Keep the change small and focused.
 
 ## Constraints
 
-- Do not change unrelated behavior.
-- Keep the diff focused.
+- Do not change the ORCHESTRATOR architecture.
+- Do not modify unrelated files.
 - Do not expose secrets.
-- Run the declared test command before final review.
-
-## Current state
-
-This file is the shared task brief. Update it when the task scope materially changes.
+- Run the test suite before reporting completion.
