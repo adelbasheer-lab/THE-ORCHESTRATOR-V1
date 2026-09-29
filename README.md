@@ -59,3 +59,59 @@ The merge step requires an explicit human approval API call.
 ## V1 limitations
 
 Task execution is currently in-process rather than a durable worker queue. A later version should add durable jobs, resumability, richer GitHub check integration, and stronger authorization around task creation and approval.
+
+
+## Model A — Zero-API Edition
+
+Model A lets you operate ORCHESTRATOR with the consumer ChatGPT and Claude interfaces, without OpenAI or Anthropic API keys. The models are connected by a structured handoff protocol and a GitHub-backed shared workspace; the human performs the baton pass between them.
+
+This mode is intentionally different from the server-side V1 execution path above:
+
+```text
+Human
+  ↓
+ChatGPT — plan / inspect / review
+  ↓
+GitHub shared workspace
+  ↓
+Claude — implement / fix
+  ↓
+GitHub shared workspace
+  ↓
+ChatGPT — test interpretation / review
+  ↓
+Human approval
+  ↓
+GitHub PR
+```
+
+### Model A protocol
+
+The protocol lives in `.orchestrator/`:
+
+- `.orchestrator/TASK.md` — the single task brief.
+- `.orchestrator/STATE.json` — current state, owners, iteration, and next action.
+- `.orchestrator/PLAN.md` — ChatGPT's plan and implementation constraints.
+- `.orchestrator/CLAUDE_HANDOFF.md` — the exact packet to paste into Claude.
+- `.orchestrator/CLAUDE_RESULT.md` — Claude's completion report.
+- `.orchestrator/GPT_REVIEW.md` — ChatGPT's review and next action.
+- `.orchestrator/HISTORY/README.md` — rules for recording important handoffs.
+
+The authoritative workflow is:
+
+1. Human writes `TASK.md`.
+2. ChatGPT reads the repository and writes `PLAN.md` and `CLAUDE_HANDOFF.md`.
+3. Human gives the handoff packet to Claude.
+4. Claude implements and records the result in `CLAUDE_RESULT.md`.
+5. Human brings Claude's result back to ChatGPT.
+6. ChatGPT reviews the implementation and updates `GPT_REVIEW.md` and `STATE.json`.
+7. Repeat IMPLEMENT → TEST → REVIEW → FIX until ChatGPT records `APPROVE`.
+8. Human opens/inspects the PR and performs the final merge decision.
+
+### Important limitation
+
+Model A does **not** provide automatic model-to-model API calls. The human is the communication bridge. It also does not imply that ChatGPT Free or Claude Free can execute arbitrary local processes on your computer through this repository. The repository is the shared source-of-truth, while each model works through the tools available in its own interface.
+
+### Later migration
+
+When API access becomes available, the Model A protocol remains useful. The human handoff can be replaced by API calls while retaining the same task, state, review, and audit concepts.
