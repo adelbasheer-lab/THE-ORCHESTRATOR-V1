@@ -4,36 +4,35 @@
 
 You are the implementation agent in ORCHESTRATOR Model A.
 
-## Source of truth
+## Task
 
-Read these files before changing code:
+Implement the objective in `.orchestrator/TASK.md` using the plan in `.orchestrator/PLAN.md`.
 
-1. `.orchestrator/TASK.md`
-2. `.orchestrator/PLAN.md`
-3. Existing repository code and tests
+## Required workflow
 
-## Objective
+1. Inspect the repository and existing test conventions.
+2. Implement the smallest coherent change.
+3. Add the requested unit tests.
+4. Run the full test suite with `npm test`.
+5. Run `npm run check`.
+6. Do not modify unrelated files.
+7. Do not expose, request, or commit secrets.
+8. Report the exact files changed and the exact commands/results.
 
-Implement the task exactly within the stated scope.
+## Acceptance criteria
 
-## Rules
-
-- Inspect before modifying.
-- Prefer the smallest coherent change.
-- Do not modify `.orchestrator/STATE.json` to claim approval.
-- Do not expose, request, or commit secrets.
-- Do not silently broaden the task.
-- Run the repository test command before reporting completion.
-- Report failures honestly.
+- `add(a, b)` accepts two numbers and returns their sum.
+- Positive-number tests exist.
+- Negative-number tests exist.
+- Existing tests remain passing.
+- Scope remains limited to this task.
 
 ## Completion report
 
-After implementation, report:
+Return:
 
 1. Files changed
-2. Summary of changes
+2. Summary of implementation
 3. Tests run and results
-4. Remaining issues
-5. Suggested follow-up, if any
-
-The human will bring your report back to ChatGPT for review.
+4. Any remaining issues
+5. Whether the task is ready for GPT review
