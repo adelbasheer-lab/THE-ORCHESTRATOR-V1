@@ -25,7 +25,7 @@ test("builds non-interactive Claude Code arguments with a locked tool surface", 
 
 test("uses the default coding tool surface when none is supplied", () => {
   const args = buildClaudeCodeArgs("inspect");
-  assert.equal(args[args.indexOf("--allowedTools") + 1], "Read,Edit,Bash,Glob,Grep");
+  assert.equal(args[args.indexOf("--allowedTools") + 1], "Read,Edit,Glob,Grep");
   assert.ok(args.includes("--permission-mode"));
   assert.ok(args.includes("dontAsk"));
 });
