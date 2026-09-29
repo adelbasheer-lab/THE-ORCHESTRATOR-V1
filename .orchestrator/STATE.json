@@ -1,0 +1,14 @@
+{
+  "protocol": "ORCHESTRATOR-MODEL-A-v1",
+  "task_id": "",
+  "state": "PLANNING",
+  "iteration": 0,
+  "repository": "OWNER/REPO",
+  "base_branch": "main",
+  "implementer": "claude",
+  "planner_reviewer": "gpt",
+  "next_action": "GPT_READ_TASK_AND_PLAN",
+  "last_handoff": null,
+  "human_approval_required_for_merge": true,
+  "updated_at": ""
+}
