@@ -12,6 +12,7 @@ User -> ORCHESTRATOR -> GPT plan -> Claude implementation -> tests -> GPT review
 - PostgreSQL task/event persistence, with in-memory fallback
 - OpenAI Responses API adapter
 - Anthropic Messages API adapter
+- Claude Code CLI adapter for subscription-authenticated local agent execution
 - MCP remote-tool plane
 - Isolated Git workspaces and branches
 - GitHub PR/merge adapter
@@ -115,3 +116,46 @@ Model A does **not** provide automatic model-to-model API calls. The human is th
 ### Later migration
 
 When API access becomes available, the Model A protocol remains useful. The human handoff can be replaced by API calls while retaining the same task, state, review, and audit concepts.
+
+## Claude Code control adapter
+
+ORCHESTRATOR can now use Claude Code as its implementation agent instead of the Anthropic Messages API. Set `CLAUDE_AGENT=claude-code` and run ORCHESTRATOR on the same machine where Claude Code is installed and authenticated.
+
+Anthropic's current documentation says Claude Code supports terminal, desktop, IDE, and web surfaces, and that the CLI can be run non-interactively with `claude -p`. The Agent SDK provides programmatic access to the same agent loop, tools, permissions, and sessions. citeturn606690view0turn551196view0turn551196view1
+
+For a local subscription-authenticated setup, install Claude Code, run `claude` once to authenticate, then configure:
+
+```bash
+CLAUDE_AGENT=claude-code
+CLAUDE_CODE_ALLOWED_TOOLS=Read,Edit,Bash,Glob,Grep
+```
+
+The adapter deliberately does not use Claude Code's `--bare` mode because Anthropic documents that bare mode does not use subscription OAuth credentials and instead requires an API key. The adapter uses `--permission-mode dontAsk` plus an explicit allow-list so the headless agent has a fixed non-interactive tool surface. citeturn551196view1turn746548search0
+
+**Account requirement:** Anthropic currently states that Claude Code requires a Pro, Max, Team, Enterprise, or Console account; the free claude.ai plan does not include Claude Code. citeturn551196view3
+
+This adapter is the bridge from our current Model A experiment toward an actual automated local agent loop:
+
+```text
+Human
+  ↓
+GPT / ORCHESTRATOR
+  ↓
+PLAN + TASK
+  ↓
+Claude Code agent
+  ↓
+local isolated workspace
+  ↓
+tests
+  ↓
+GPT review
+  ↓
+fix loop
+  ↓
+GitHub PR
+  ↓
+human approval
+```
+
+The current implementation keeps the existing GitHub and human-approval boundaries. It does not grant Claude Code permission to merge the final pull request.
