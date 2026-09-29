@@ -1,0 +1,40 @@
+name: Research Pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Deterministic pilot seed"
+        required: false
+        default: "20260929"
+      repetitions:
+        description: "Repetitions per task and condition"
+        required: false
+        default: "3"
+  push:
+    paths:
+      - "research/fixtures.json"
+      - "research/pilot-runner.mjs"
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run deterministic pilot harness
+        env:
+          PILOT_SEED: ${{ github.event.inputs.seed || '20260929' }}
+          PILOT_REPETITIONS: ${{ github.event.inputs.repetitions || '3' }}
+        run: node research/pilot-runner.mjs > pilot-results.json
+      - name: Validate run count
+        run: node -e "const x=require('./pilot-results.json'); if(x.runCount !== 60) process.exit(1); if(x.summary.IMPLEMENTATION_ONLY.runs !== 30 || x.summary.STRUCTURED_OVERSIGHT.runs !== 30) process.exit(1); console.log(JSON.stringify(x.summary,null,2))"
+      - name: Upload pilot results
+        uses: actions/upload-artifact@v4
+        with:
+          name: orchestrator-pilot-results
+          path: pilot-results.json
