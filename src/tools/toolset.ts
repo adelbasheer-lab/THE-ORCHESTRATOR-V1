@@ -1,0 +1,2 @@
+export interface ToolDefinition { name:string; description:string; inputSchema:Record<string,unknown>; strict?:boolean; }
+export interface AgentTools { readonly definitions:ToolDefinition[]; execute(name:string,input:Record<string,unknown>):Promise<string>; }

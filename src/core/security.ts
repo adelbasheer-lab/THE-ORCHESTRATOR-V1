@@ -1,0 +1,16 @@
+import { timingSafeEqual } from "node:crypto";
+export class SecurityPolicy{
+ readonly allowedRepositories:Set<string>;readonly allowedTestCommands:Set<string>;readonly maxTaskMinutes:number;readonly testTimeoutMs:number;readonly keepFailedWorkspaces:boolean;
+ private readonly apiKey:string|undefined;private readonly approvalKey:string|undefined;private readonly allowAnonymousDev:boolean;private readonly secrets:string[];
+ constructor(env:NodeJS.ProcessEnv=process.env){
+  this.allowedRepositories=new Set(parseCsv(env.GITHUB_ALLOWED_REPOSITORIES||env.GITHUB_REPOSITORY));this.allowedTestCommands=new Set(parseCsv(env.ALLOWED_TEST_COMMANDS||"npm test"));this.maxTaskMinutes=positiveInt(env.MAX_TASK_MINUTES,30,1,240);this.testTimeoutMs=positiveInt(env.TEST_TIMEOUT_MS,1800000,1000,7200000);this.keepFailedWorkspaces=env.KEEP_FAILED_WORKSPACES==="true";
+  this.apiKey=env.ORCHESTRATOR_API_KEY?.trim()||undefined;this.approvalKey=env.ORCHESTRATOR_APPROVAL_KEY?.trim()||undefined;this.allowAnonymousDev=env.NODE_ENV!=="production"&&env.ORCHESTRATOR_ALLOW_ANONYMOUS_DEV==="true";this.secrets=[this.apiKey,this.approvalKey,env.OPENAI_API_KEY,env.ANTHROPIC_API_KEY,env.GITHUB_TOKEN,...parseMcpSecrets(env.MCP_SERVERS_JSON)].filter((v):v is string=>Boolean(v));
+ }
+ requireApiKey(provided:string|undefined){this.requireSecret(this.apiKey,provided,"ORCHESTRATOR_API_KEY");}requireApprovalKey(provided:string|undefined){this.requireSecret(this.approvalKey,provided,"ORCHESTRATOR_APPROVAL_KEY");}
+ assertRepository(repository:string){if(!this.allowedRepositories.has(repository))throw new Error("Repository is not allowed by GITHUB_ALLOWED_REPOSITORIES");}assertTestCommand(command:string){if(!this.allowedTestCommands.has(command))throw new Error("Test command is not allowed by ALLOWED_TEST_COMMANDS");}
+ assertWithinDeadline(deadlineAt:number){if(Date.now()>deadlineAt)throw new Error("Task deadline exceeded");}deadlineAt(createdAt:string){return new Date(createdAt).getTime()+this.maxTaskMinutes*60000;}
+ redact(value:unknown):unknown{if(typeof value==="string")return this.redactText(value);if(Array.isArray(value))return value.map(v=>this.redact(v));if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,this.redact(v)]));return value;}
+ private redactText(value:string){let r=value;for(const secret of this.secrets)if(secret.length>=6)r=r.split(secret).join("[REDACTED]");return r.length>20000?r.slice(0,20000)+"\n[truncated]":r;}
+ private requireSecret(expected:string|undefined,provided:string|undefined,name:string){if(!expected){if(this.allowAnonymousDev)return;throw new Error(name+" is not configured");}if(!provided||!safeEqual(expected,provided))throw new Error("Unauthorized");}
+}
+function safeEqual(a:string,b:string){const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);}function parseCsv(v?:string){return (v||"").split(",").map(x=>x.trim()).filter(Boolean);}function positiveInt(v:string|undefined,f:number,min:number,max:number){const n=Number(v??f);return Number.isInteger(n)&&n>=min&&n<=max?n:f;}function parseMcpSecrets(v?:string){if(!v)return [];try{const a=JSON.parse(v);return Array.isArray(a)?a.flatMap((x:any)=>typeof x?.authToken==="string"?[x.authToken]:[]):[];}catch{return [];}}
