@@ -69,7 +69,7 @@ if (process.env.CLAUDE_CODE_MODEL) args.push("--model", process.env.CLAUDE_CODE_
 
 let stream;
 try {
-  stream = await run("claude", args, workspace, Number(process.env.CLAUDE_CODE_TIMEOUT_MS || 1800000));
+  stream = await run(process.env.CLAUDE_CODE_COMMAND || "claude", args, workspace, Number(process.env.CLAUDE_CODE_TIMEOUT_MS || 1800000));
 } catch (error) {
   const result = {
     manifest,
