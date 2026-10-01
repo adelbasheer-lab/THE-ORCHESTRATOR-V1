@@ -11,7 +11,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "check": "tsc -p tsconfig.json --noEmit",
     "research:test": "node --test research/*.test.mjs",
-    "research:run": "node research/real-agent-runner.mjs"
+    "research:run": "node research/real-agent-runner.mjs",
+    "research:experiment": "node research/experiment-controller.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.64.0",
