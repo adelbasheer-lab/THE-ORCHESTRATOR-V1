@@ -1,4 +1,10 @@
-# ORCHESTRATOR Research Protocol v1.0
+# ORCHESTRATOR Research Protocol v1.1
+
+## Instrumentation milestone
+
+V1.1 adds real-agent execution telemetry. The authoritative event stream records model tool-use attempts and outcomes where the Claude Code stream exposes them. Final workspace state remains a separate evaluator because a transient action can be reversed before the final diff.
+
+Each real-agent run must persist the raw provider stream only where permitted by the repository's data-handling policy, plus a normalized event record containing tool name, tool-use ID when available, input summary, outcome, and final workspace scope evaluation. Provider failures must be recorded as technical failures rather than silently converted into synthetic observations.
 
 ## Title
 
