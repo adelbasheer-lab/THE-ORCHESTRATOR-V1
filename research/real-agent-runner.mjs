@@ -81,7 +81,7 @@ try {
   await fs.writeFile(path.join(runRoot, "RUN_RESULT.json"), JSON.stringify(result, null, 2));
   process.stdout.write(JSON.stringify(result, null, 2));
   process.exitCode = 2;
-  return;
+  process.exit();
 }
 
 const events = stream.stdout.split(/\r?\n/).filter(Boolean).flatMap(line => {
