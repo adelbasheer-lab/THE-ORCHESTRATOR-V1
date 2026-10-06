@@ -1,7 +1,6 @@
 package com.orchestrator.localuploader;
 
-import android.content.ContentResolver;
-import android.content.ContentUris;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -9,9 +8,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
+import android.text.InputType;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -22,8 +22,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends android.app.Activity {
@@ -38,8 +36,12 @@ public class MainActivity extends android.app.Activity {
 
     private SharedPreferences prefs;
     private TextView destinationView;
+    private TextView githubView;
     private TextView filesView;
     private Uri destinationTreeUri;
+
+    private GitHubTokenStore tokenStore;
+    private GitHubIntakeClient githubClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +52,9 @@ public class MainActivity extends android.app.Activity {
         if (savedTree != null) {
             destinationTreeUri = Uri.parse(savedTree);
         }
+
+        tokenStore = new GitHubTokenStore(this);
+        githubClient = new GitHubIntakeClient(tokenStore);
 
         buildUi();
         refreshUi();
@@ -85,6 +90,35 @@ public class MainActivity extends android.app.Activity {
         copyFiles.setOnClickListener(v -> copySelectedFiles());
         root.addView(copyFiles);
 
+        githubView = new TextView(this);
+        githubView.setPadding(0, 24, 0, 8);
+        root.addView(githubView);
+
+        Button configureGitHub = new Button(this);
+        configureGitHub.setText("Configure GitHub intake access");
+        configureGitHub.setOnClickListener(v -> configureGitHub());
+        root.addView(configureGitHub);
+
+        Button testGitHub = new Button(this);
+        testGitHub.setText("Test GitHub intake access");
+        testGitHub.setOnClickListener(v -> testGitHub());
+        root.addView(testGitHub);
+
+        Button sendToGitHub = new Button(this);
+        sendToGitHub.setText("Send selected files to GitHub intake");
+        sendToGitHub.setOnClickListener(v -> sendSelectedToGitHub());
+        root.addView(sendToGitHub);
+
+        Button disconnectGitHub = new Button(this);
+        disconnectGitHub.setText("Remove stored GitHub access");
+        disconnectGitHub.setOnClickListener(v -> disconnectGitHub());
+        root.addView(disconnectGitHub);
+
+        Button openIntake = new Button(this);
+        openIntake.setText("Open GitHub intake repository");
+        openIntake.setOnClickListener(v -> openIntakeRepository());
+        root.addView(openIntake);
+
         Button clearFiles = new Button(this);
         clearFiles.setText("Clear selection");
         clearFiles.setOnClickListener(v -> {
@@ -101,6 +135,7 @@ public class MainActivity extends android.app.Activity {
 
         filesView = new TextView(this);
         filesView.setPadding(0, 24, 0, 0);
+
         ScrollView scroll = new ScrollView(this);
         scroll.addView(filesView);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -108,12 +143,172 @@ public class MainActivity extends android.app.Activity {
         setContentView(root);
     }
 
+    private void configureGitHub() {
+        final EditText input = new EditText(this);
+        input.setHint("Paste fine-grained GitHub token");
+        input.setSingleLine(true);
+        input.setInputType(
+                InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_PASSWORD
+        );
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(32, 8, 32, 0);
+        panel.addView(input);
+
+        TextView help = new TextView(this);
+        help.setText(
+                "Create a fine-grained token restricted to "
+                        + "THE-ORCHESTRATOR-INTAKE with "
+                        + "Contents: Read and write. "
+                        + "The token is encrypted locally with Android Keystore."
+        );
+        help.setPadding(0, 8, 0, 0);
+        panel.addView(help);
+
+        new AlertDialog.Builder(this)
+                .setTitle("GitHub intake access")
+                .setView(panel)
+                .setNeutralButton(
+                        "Open token settings",
+                        (dialog, which) -> openTokenSettings()
+                )
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton(
+                        "Save",
+                        (dialog, which) ->
+                                saveGitHubToken(input.getText().toString())
+                )
+                .show();
+    }
+
+    private void saveGitHubToken(String token) {
+        try {
+            tokenStore.saveToken(token);
+            refreshUi();
+            toast("GitHub access saved. Test it before uploading.");
+        } catch (Exception e) {
+            toast("Could not save GitHub access: " + safeError(e));
+        }
+    }
+
+    private void testGitHub() {
+        if (!tokenStore.hasToken()) {
+            toast("Configure GitHub access first.");
+            return;
+        }
+
+        toast("Testing GitHub intake access...");
+
+        new Thread(() -> {
+            try {
+                githubClient.testConnection();
+                runOnUiThread(() ->
+                        toast("GitHub intake access is working."));
+            } catch (Exception e) {
+                String message = safeError(e);
+                runOnUiThread(() ->
+                        toast("GitHub test failed: " + message));
+            }
+        }).start();
+    }
+
+    private void sendSelectedToGitHub() {
+        if (!tokenStore.hasToken()) {
+            toast("Configure GitHub access first.");
+            return;
+        }
+
+        if (selectedUris.isEmpty()) {
+            toast("Select at least one file.");
+            return;
+        }
+
+        new Thread(() -> {
+            String batchId = githubClient.createBatchId();
+            int uploaded = 0;
+            int failed = 0;
+            ArrayList<String> failures = new ArrayList<>();
+
+            for (int i = 0; i < selectedUris.size(); i++) {
+                String name = selectedNames.get(i);
+                int current = i + 1;
+                int total = selectedUris.size();
+
+                runOnUiThread(() ->
+                        toast("Uploading " + current + "/" + total + ": " + name));
+
+                try {
+                    githubClient.uploadFile(
+                            getContentResolver(),
+                            selectedUris.get(i),
+                            name,
+                            batchId
+                    );
+                    uploaded++;
+                } catch (Exception e) {
+                    failed++;
+                    failures.add(name + ": " + safeError(e));
+                }
+            }
+
+            final int done = uploaded;
+            final int errors = failed;
+            final String details = String.join("\n", failures);
+
+            runOnUiThread(() -> {
+                if (errors == 0) {
+                    toast("Uploaded " + done + " file(s) to GitHub intake.");
+                } else {
+                    toast("Uploaded: " + done + " | Failed: " + errors
+                            + "\n" + details);
+                }
+            });
+        }).start();
+    }
+
+    private void openTokenSettings() {
+        Intent intent = new Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(
+                        "https://github.com/settings/personal-access-tokens/fine-grained/new"
+                )
+        );
+        startActivity(intent);
+    }
+
+    private void disconnectGitHub() {
+        tokenStore.clear();
+        refreshUi();
+        toast("Stored GitHub access removed.");
+    }
+
+    private void openIntakeRepository() {
+        Intent intent = new Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(
+                        "https://github.com/" + GitHubIntakeClient.REPOSITORY
+                )
+        );
+        startActivity(intent);
+    }
+
+    private String safeError(Exception e) {
+        String message = e.getMessage();
+        return message == null || message.isBlank()
+                ? e.getClass().getSimpleName()
+                : message;
+    }
+
     private void chooseFolder() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+        );
         startActivityForResult(intent, PICK_FOLDER);
     }
 
@@ -122,8 +317,10 @@ public class MainActivity extends android.app.Activity {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        );
         startActivityForResult(intent, PICK_FILES);
     }
 
@@ -134,31 +331,46 @@ public class MainActivity extends android.app.Activity {
         }
 
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, destinationTreeUri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        intent.putExtra(
+                DocumentsContract.EXTRA_INITIAL_URI,
+                destinationTreeUri
+        );
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+        );
         startActivity(intent);
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data
+    ) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (resultCode != RESULT_OK || data == null) {
             return;
         }
 
         if (requestCode == PICK_FOLDER) {
             Uri tree = data.getData();
-            if (tree == null) return;
+            if (tree == null) {
+                return;
+            }
+
             int flags = data.getFlags()
                     & (Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
             try {
                 getContentResolver().takePersistableUriPermission(tree, flags);
             } catch (SecurityException ignored) {
             }
+
             destinationTreeUri = tree;
             prefs.edit().putString(PREF_TREE_URI, tree.toString()).apply();
             refreshUi();
@@ -170,22 +382,30 @@ public class MainActivity extends android.app.Activity {
             selectedNames.clear();
 
             if (data.getClipData() != null) {
-                for (int i = 0; i < data.getClipData().getItemCount(); i++) {
-                    addSelection(data.getClipData().getItemAt(i).getUri());
+                for (int i = 0;
+                     i < data.getClipData().getItemCount();
+                     i++) {
+                    addSelection(
+                            data.getClipData().getItemAt(i).getUri()
+                    );
                 }
             } else if (data.getData() != null) {
                 addSelection(data.getData());
             }
+
             refreshUi();
         }
     }
 
     private void addSelection(Uri uri) {
-        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
         try {
-            getContentResolver().takePersistableUriPermission(uri, flags);
+            getContentResolver().takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+            );
         } catch (SecurityException ignored) {
         }
+
         selectedUris.add(uri);
         selectedNames.add(getDisplayName(uri));
     }
@@ -195,6 +415,7 @@ public class MainActivity extends android.app.Activity {
             toast("Choose a workspace folder first.");
             return;
         }
+
         if (selectedUris.isEmpty()) {
             toast("Select at least one file.");
             return;
@@ -207,16 +428,13 @@ public class MainActivity extends android.app.Activity {
 
             for (int i = 0; i < selectedUris.size(); i++) {
                 String name = selectedNames.get(i);
+
                 try {
                     copyOne(selectedUris.get(i), name);
                     copied++;
                 } catch (Exception e) {
                     failed++;
-                    String reason = e.getMessage();
-                    if (reason == null || reason.isBlank()) {
-                        reason = e.getClass().getSimpleName();
-                    }
-                    failures.add(name + ": " + reason);
+                    failures.add(name + ": " + safeError(e));
                 }
             }
 
@@ -235,15 +453,21 @@ public class MainActivity extends android.app.Activity {
         }).start();
     }
 
-    private void copyOne(Uri sourceUri, String originalName) throws IOException {
+    private void copyOne(
+            Uri sourceUri,
+            String originalName
+    ) throws IOException {
+
         String safeName = nextAvailableName(originalName);
         String mime = getContentResolver().getType(sourceUri);
-        if (mime == null) mime = "application/octet-stream";
 
-        // ACTION_OPEN_DOCUMENT_TREE returns a tree URI. createDocument()
-        // expects a document URI representing the destination directory.
+        if (mime == null) {
+            mime = "application/octet-stream";
+        }
+
         String destinationDocumentId =
                 DocumentsContract.getTreeDocumentId(destinationTreeUri);
+
         Uri destinationDocumentUri =
                 DocumentsContract.buildDocumentUriUsingTree(
                         destinationTreeUri,
@@ -261,31 +485,42 @@ public class MainActivity extends android.app.Activity {
             throw new IOException("Unable to create target document");
         }
 
-        try (InputStream in = getContentResolver().openInputStream(sourceUri);
-             OutputStream out = getContentResolver().openOutputStream(targetUri, "w")) {
-
+        try (
+                InputStream in =
+                        getContentResolver().openInputStream(sourceUri);
+                OutputStream out =
+                        getContentResolver().openOutputStream(
+                                targetUri, "w")
+        ) {
             if (in == null || out == null) {
                 throw new IOException("Unable to open source or target");
             }
 
             byte[] buffer = new byte[1024 * 1024];
             int read;
+
             while ((read = in.read(buffer)) != -1) {
                 out.write(buffer, 0, read);
             }
+
             out.flush();
         }
     }
 
     private String nextAvailableName(String requested) {
         Set<String> existing = listChildrenNames();
+
         if (!existing.contains(requested)) {
             return requested;
         }
 
         int dot = requested.lastIndexOf('.');
-        String base = dot > 0 ? requested.substring(0, dot) : requested;
-        String ext = dot > 0 ? requested.substring(dot) : "";
+        String base = dot > 0
+                ? requested.substring(0, dot)
+                : requested;
+        String ext = dot > 0
+                ? requested.substring(dot)
+                : "";
 
         for (int n = 1; n < 100000; n++) {
             String candidate = base + "_" + n + ext;
@@ -300,18 +535,26 @@ public class MainActivity extends android.app.Activity {
     private Set<String> listChildrenNames() {
         HashSet<String> names = new HashSet<>();
 
-        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                destinationTreeUri,
-                DocumentsContract.getTreeDocumentId(destinationTreeUri)
-        );
+        Uri childrenUri =
+                DocumentsContract.buildChildDocumentsUriUsingTree(
+                        destinationTreeUri,
+                        DocumentsContract.getTreeDocumentId(
+                                destinationTreeUri
+                        )
+                );
 
-        String[] projection = new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME};
+        String[] projection = new String[]{
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME
+        };
 
         try (Cursor c = getContentResolver().query(
                 childrenUri, projection, null, null, null)) {
 
             if (c != null) {
-                int nameIndex = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+                int nameIndex = c.getColumnIndex(
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                );
+
                 while (c.moveToNext() && nameIndex >= 0) {
                     names.add(c.getString(nameIndex));
                 }
@@ -324,15 +567,19 @@ public class MainActivity extends android.app.Activity {
 
     private String getDisplayName(Uri uri) {
         String fallback = uri.getLastPathSegment();
+
         try (Cursor c = getContentResolver().query(
                 uri,
                 new String[]{OpenableColumns.DISPLAY_NAME},
                 null,
                 null,
-                null)) {
-
+                null
+        )) {
             if (c != null && c.moveToFirst()) {
-                int index = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                int index = c.getColumnIndex(
+                        OpenableColumns.DISPLAY_NAME
+                );
+
                 if (index >= 0) {
                     String name = c.getString(index);
                     if (name != null && !name.isBlank()) {
@@ -342,31 +589,51 @@ public class MainActivity extends android.app.Activity {
             }
         } catch (Exception ignored) {
         }
+
         return fallback == null ? "file" : fallback;
     }
 
     private void refreshUi() {
-        if (destinationView == null || filesView == null) return;
+        if (destinationView == null
+                || filesView == null
+                || githubView == null) {
+            return;
+        }
 
-        destinationView.setText(destinationTreeUri == null
-                ? "Workspace: not selected"
-                : "Workspace: selected");
+        destinationView.setText(
+                destinationTreeUri == null
+                        ? "Workspace: not selected"
+                        : "Workspace: selected"
+        );
+
+        githubView.setText(
+                "GitHub intake: " + GitHubIntakeClient.REPOSITORY
+                        + "\nAccess: "
+                        + (tokenStore.hasToken()
+                        ? "configured"
+                        : "not configured")
+        );
 
         if (selectedNames.isEmpty()) {
             filesView.setText("No files selected.");
             return;
         }
 
-        StringBuilder sb = new StringBuilder("Selected files:\n");
+        StringBuilder sb =
+                new StringBuilder("Selected files:\n");
+
         for (String name : selectedNames) {
             sb.append("• ").append(name).append('\n');
         }
+
         filesView.setText(sb.toString());
     }
 
     private void toast(String message) {
-        runOnUiThread(() ->
-                Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show()
-        );
+        Toast.makeText(
+                MainActivity.this,
+                message,
+                Toast.LENGTH_SHORT
+        ).show();
     }
 }
