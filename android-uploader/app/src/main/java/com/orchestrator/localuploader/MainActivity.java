@@ -203,21 +203,34 @@ public class MainActivity extends android.app.Activity {
         new Thread(() -> {
             int copied = 0;
             int failed = 0;
+            ArrayList<String> failures = new ArrayList<>();
 
             for (int i = 0; i < selectedUris.size(); i++) {
+                String name = selectedNames.get(i);
                 try {
-                    copyOne(selectedUris.get(i), selectedNames.get(i));
+                    copyOne(selectedUris.get(i), name);
                     copied++;
                 } catch (Exception e) {
                     failed++;
+                    String reason = e.getMessage();
+                    if (reason == null || reason.isBlank()) {
+                        reason = e.getClass().getSimpleName();
+                    }
+                    failures.add(name + ": " + reason);
                 }
             }
 
             final int done = copied;
             final int errors = failed;
+            final String failureDetails = String.join("\n", failures);
 
             runOnUiThread(() -> {
-                toast("Copied: " + done + " | Failed: " + errors);
+                if (errors == 0) {
+                    toast("Copied: " + done);
+                } else {
+                    toast("Copied: " + done + " | Failed: " + errors
+                            + "\n" + failureDetails);
+                }
             });
         }).start();
     }
@@ -227,9 +240,19 @@ public class MainActivity extends android.app.Activity {
         String mime = getContentResolver().getType(sourceUri);
         if (mime == null) mime = "application/octet-stream";
 
+        // ACTION_OPEN_DOCUMENT_TREE returns a tree URI. createDocument()
+        // expects a document URI representing the destination directory.
+        String destinationDocumentId =
+                DocumentsContract.getTreeDocumentId(destinationTreeUri);
+        Uri destinationDocumentUri =
+                DocumentsContract.buildDocumentUriUsingTree(
+                        destinationTreeUri,
+                        destinationDocumentId
+                );
+
         Uri targetUri = DocumentsContract.createDocument(
                 getContentResolver(),
-                destinationTreeUri,
+                destinationDocumentUri,
                 mime,
                 safeName
         );
