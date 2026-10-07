@@ -157,19 +157,6 @@ public final class GitHubTokenStore {
                             ((KeyStore.SecretKeyEntry) entry)
                                     .getSecretKey();
 
-                    // Exercise the key before using it for token storage.
-                    Cipher cipher =
-                            Cipher.getInstance(
-                                    "AES/GCM/NoPadding"
-                            );
-                    cipher.init(
-                            Cipher.ENCRYPT_MODE,
-                            key,
-                            new GCMParameterSpec(
-                                    128,
-                                    new byte[12]
-                            )
-                    );
                     return key;
                 }
 
