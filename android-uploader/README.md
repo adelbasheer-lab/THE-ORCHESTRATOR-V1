@@ -23,3 +23,6 @@ The artifact contains:
 5. Attach the copied files manually to the ChatGPT conversation.
 
 No storage permission is required because the app uses Android's Storage Access Framework.
+
+
+Build validation marker: session-only GitHub intake credential path.
