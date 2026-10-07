@@ -95,7 +95,7 @@ public class MainActivity extends android.app.Activity {
         root.addView(githubView);
 
         Button configureGitHub = new Button(this);
-        configureGitHub.setText("Configure GitHub intake access");
+        configureGitHub.setText("Configure GitHub intake session");
         configureGitHub.setOnClickListener(v -> configureGitHub());
         root.addView(configureGitHub);
 
@@ -110,7 +110,7 @@ public class MainActivity extends android.app.Activity {
         root.addView(sendToGitHub);
 
         Button disconnectGitHub = new Button(this);
-        disconnectGitHub.setText("Remove stored GitHub access");
+        disconnectGitHub.setText("Clear GitHub session access");
         disconnectGitHub.setOnClickListener(v -> disconnectGitHub());
         root.addView(disconnectGitHub);
 
@@ -145,7 +145,7 @@ public class MainActivity extends android.app.Activity {
 
     private void configureGitHub() {
         final EditText input = new EditText(this);
-        input.setHint("Paste fine-grained GitHub token");
+        input.setHint("Paste fine-grained GitHub token (session only)");
         input.setSingleLine(true);
         input.setInputType(
                 InputType.TYPE_CLASS_TEXT
@@ -159,16 +159,17 @@ public class MainActivity extends android.app.Activity {
 
         TextView help = new TextView(this);
         help.setText(
-                "Create a fine-grained token restricted to "
+                "Use a fine-grained token restricted to "
                         + "THE-ORCHESTRATOR-INTAKE with "
                         + "Contents: Read and write. "
-                        + "The token is encrypted locally with Android Keystore."
+                        + "The token is kept only in memory for this app session "
+                        + "and is never stored on the device."
         );
         help.setPadding(0, 8, 0, 0);
         panel.addView(help);
 
         new AlertDialog.Builder(this)
-                .setTitle("GitHub intake access")
+                .setTitle("GitHub intake session")
                 .setView(panel)
                 .setNeutralButton(
                         "Open token settings",
@@ -176,7 +177,7 @@ public class MainActivity extends android.app.Activity {
                 )
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton(
-                        "Save",
+                        "Use for this session",
                         (dialog, which) ->
                                 saveGitHubToken(input.getText().toString())
                 )
@@ -187,7 +188,7 @@ public class MainActivity extends android.app.Activity {
         try {
             tokenStore.saveToken(token);
             refreshUi();
-            toast("GitHub access saved. Test it before uploading.");
+            toast("GitHub token loaded for this session. Test it before uploading.");
         } catch (Exception e) {
             toast("Could not save GitHub access: " + safeError(e));
         }
@@ -281,7 +282,7 @@ public class MainActivity extends android.app.Activity {
     private void disconnectGitHub() {
         tokenStore.clear();
         refreshUi();
-        toast("Stored GitHub access removed.");
+        toast("GitHub session access cleared.");
     }
 
     private void openIntakeRepository() {
@@ -610,8 +611,9 @@ public class MainActivity extends android.app.Activity {
                 "GitHub intake: " + GitHubIntakeClient.REPOSITORY
                         + "\nAccess: "
                         + (tokenStore.hasToken()
-                        ? "configured"
+                        ? "configured for this session"
                         : "not configured")
+                        + "\nCredential storage: session-only"
         );
 
         if (selectedNames.isEmpty()) {
