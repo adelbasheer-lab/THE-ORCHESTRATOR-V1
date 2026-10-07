@@ -12,7 +12,10 @@ public final class GitHubTokenStore {
 
     private volatile String token;
 
-    public GitHubTokenStore() {\n    }\n\n    public boolean hasToken() {
+    public GitHubTokenStore() {
+    }
+
+    public boolean hasToken() {
         return token != null && !token.isBlank();
     }
 
