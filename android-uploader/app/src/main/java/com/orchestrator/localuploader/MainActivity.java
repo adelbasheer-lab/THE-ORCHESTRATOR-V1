@@ -53,7 +53,7 @@ public class MainActivity extends android.app.Activity {
             destinationTreeUri = Uri.parse(savedTree);
         }
 
-        tokenStore = new GitHubTokenStore(this);
+        tokenStore = new GitHubTokenStore();
         githubClient = new GitHubIntakeClient(tokenStore);
 
         buildUi();
